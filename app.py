@@ -45,7 +45,8 @@ def welcome():
         f"/api/v1.0/precipitation<br/>"
         f"/api/v1.0/stations<br/>"
         f"/api/v1.0/tobs</br>"
-        f"/api/v1.0/date_stat</br>"
+        f"/api/v1.0/insert-start-date</br>"
+        f"/api/v1.0/insert-start-date/insert-end-date</br>"
     )
 
 @app.route("/api/v1.0/precipitation")
@@ -56,26 +57,32 @@ def precipitation():
     Measurement.prcp]
     results = session.query(*sel).\
     filter(Measurement.date > '2016-08-23').\
+    group_by (Measurement.date).\
     order_by (Measurement.date).all()
 
-    # Convert list of tuples into normal list
-    all_prcp = list(np.ravel(results))
+    # Create dictionary
+    all_prcp = []
+    for precip in results:
+        precip_dict = {}
+        precip_dict['date'] = precip.date
+        precip_dict['temp'] = precip.prcp
+        all_prcp.append(precip_dict)
+
 
     return jsonify(all_prcp)
 
 @app.route("/api/v1.0/stations")
 def stations():
     """Return list of stations"""
-    sel = [Station.station,
-    Station.name]
+    sel = [Station.name]
     results = session.query(*sel).all()
 
     stations = list(np.ravel(results))
 
     return jsonify(stations)
 
-@app.route("/api/v1.0/tobs")
-def tobs():
+@app.route("/api/v1.0/temp")
+def temp():
     """Return a list of station temperatures for last 365 days"""
     # Query for dates and temperature
     sel = [Measurement.date,
@@ -89,22 +96,35 @@ def tobs():
 
     return jsonify(temp365)  
 
-@app.route("/api/v1.0/date_stat")
-def date_stat():
-    """Return a list of passenger data including the name, age, and sex of each passenger"""
+@app.route("/api/v1.0/<start>")
+def date_start(start):
+    """Return a min, max, avg temp greater than start date"""
     # Query for dates and min, avg, max temperature
-    sel = [Measurement.date, 
-       func.min(Measurement.tobs), 
+    sel = [func.min(Measurement.tobs), 
        func.max(Measurement.tobs), 
        func.avg(Measurement.tobs)] 
     results = session.query(*sel).\
-    group_by (Measurement.date).\
-    sort_by (Measurement.date).all()
+    filter(Measurement.date > start).all()
 
     # Convert list of tuples into normal list
-    temp_stat = list(np.ravel(results))
+    temp_stat_start = list(np.ravel(results))
 
-    return jsonify(temp_stat)
+    return jsonify(temp_stat_start)
+
+@app.route("/api/v1.0/<start>/<end>")
+def date_start_end(start, end):
+    """Return a min, max, avg temp greater than start date and less than end date"""
+    # Query for dates and min, avg, max temperature
+    sel = [func.min(Measurement.tobs), 
+       func.max(Measurement.tobs), 
+       func.avg(Measurement.tobs)] 
+    results = session.query(*sel).\
+    filter(and_(Measurement.date > start), Measurement.date < end).all()
+
+    # Convert list of tuples into normal list
+    temp_stat_end = list(np.ravel(results))
+
+    return jsonify(temp_stat_end)
 
 
 if __name__ == '__main__':
